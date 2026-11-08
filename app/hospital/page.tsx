@@ -217,8 +217,8 @@ export default function HospitalDashboard() {
         setSuccess("");
         setSubmitting(true);
 
-        const deadlineIso = form.deadline 
-            ? new Date(form.deadline).toISOString() 
+        const deadlineIso = form.deadline
+            ? new Date(form.deadline).toISOString()
             : new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
         const payload = {

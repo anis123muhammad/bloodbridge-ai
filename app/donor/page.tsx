@@ -277,7 +277,7 @@ export default function DonorDashboard() {
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json", ...authHeaders },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             response: responseStatus.toLowerCase(),
                             message: `I have ${responseStatus.toLowerCase()} the invitation.`
                         }),
@@ -979,4 +979,3 @@ export default function DonorDashboard() {
         </main>
     );
 }
-
