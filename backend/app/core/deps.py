@@ -2,7 +2,12 @@
 import uuid
 from collections.abc import Callable
 
-import jwt
+try:
+    import jwt
+    JWTError = jwt.PyJWTError
+except ImportError:
+    from jose import jwt
+    JWTError = jwt.JWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -23,7 +28,7 @@ def get_current_user(
     try:
         payload = decode_access_token(creds.credentials)
         user_id = uuid.UUID(payload["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError):
+    except (JWTError, KeyError, ValueError):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
     user = db.get(User, user_id)
     if user is None:

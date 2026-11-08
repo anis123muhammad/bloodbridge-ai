@@ -1,7 +1,10 @@
 from datetime import timedelta
 
 import bcrypt
-import jwt
+try:
+    import jwt
+except ImportError:
+    from jose import jwt  # fallback when python-jose is installed instead of PyJWT
 
 from app.core.config import get_settings
 from app.utils.time import utcnow
