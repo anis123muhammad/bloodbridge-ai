@@ -61,7 +61,7 @@ Resolve relative times ("tonight", "by 6pm", "in 3 hours") using the current tim
 _WORD_NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
                  "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1}
 _BG_RE = re.compile(
-    r"\b(AB|A|B|O)\s*(\+ve|-ve|\+|-|positive|negative|pos|neg)(?![a-z])", re.IGNORECASE
+    r"\b(AB|A|B|O)[\s-]*(\+ve|-ve|positive|negative|pos|neg|\+|-)(?![a-z])", re.IGNORECASE
 )
 _UNITS_RE = re.compile(
     r"\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\s+"
