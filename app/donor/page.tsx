@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getAuthHeaders } from "../lib/auth";
+import { getAuthHeaders, API_BASE_URL } from "../lib/auth";
 import {
     Droplets,
     LayoutDashboard,
@@ -64,7 +64,7 @@ type Invitation = {
     status: "Pending" | "Accepted" | "Declined" | "Completed";
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = API_BASE_URL;
 
 const demoDonor: Donor = {
     id: "DNR-2048",

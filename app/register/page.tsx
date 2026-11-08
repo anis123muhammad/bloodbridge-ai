@@ -5,9 +5,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Droplets } from "lucide-react";
-import { getDashboardPath, saveUser, type UserRole } from "../lib/auth";
+import { getDashboardPath, saveUser, API_BASE_URL, type UserRole } from "../lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = API_BASE_URL;
 
 export default function RegisterPage() {
     const router = useRouter();

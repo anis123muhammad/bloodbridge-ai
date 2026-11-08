@@ -1,6 +1,8 @@
 
 export type UserRole = "admin" | "donor" | "hospital";
 
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export type AuthUser = {
     name: string;
     email: string;

@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Droplets, Mail, Lock, ArrowRight, HeartPulse } from "lucide-react";
 import {
-    saveUser, getDashboardPath, type UserRole
+    saveUser, getDashboardPath, API_BASE_URL, type UserRole
 } from "../lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = API_BASE_URL;
 
 export default function LoginPage() {
     const router = useRouter();

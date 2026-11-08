@@ -2,7 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getAuthHeaders } from "../lib/auth";
+import { getAuthHeaders, API_BASE_URL } from "../lib/auth";
 import {
     Droplets, LayoutDashboard, FilePlus2, ClipboardList,
     Users, Bell, Moon, Sun, RefreshCw, MapPin,
@@ -10,7 +10,7 @@ import {
     Check, X, HeartPulse, Activity, ShieldCheck
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = API_BASE_URL;
 
 type RequestStatus = "Pending" | "Matching" | "Matched" | "Completed" | "Cancelled";
 

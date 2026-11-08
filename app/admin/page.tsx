@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAuthHeaders, API_BASE_URL } from "../lib/auth";
 import {
   Droplets,
   LayoutDashboard,
@@ -110,6 +111,111 @@ export default function Home() {
   const accent = "#f43f5e";
   const [active, setActive] = useState("Overview");
   const [filter, setFilter] = useState("All");
+
+  const [isLive, setIsLive] = useState(false);
+  const [liveOverview, setLiveOverview] = useState<any>(null);
+  const [liveRequests, setLiveRequests] = useState<string[][]>([]);
+  const [liveActivities, setLiveActivities] = useState<string[][]>([]);
+  const [liveAuditLogs, setLiveAuditLogs] = useState<string[][]>([]);
+
+  useEffect(() => {
+    async function loadAdminData() {
+      try {
+        const headers = { "Content-Type": "application/json", ...getAuthHeaders() };
+        const [overviewRes, requestsRes, runsRes, auditRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/analytics/overview`, { headers }),
+          fetch(`${API_BASE_URL}/api/requests`, { headers }),
+          fetch(`${API_BASE_URL}/api/agents/runs?page_size=10`, { headers }),
+          fetch(`${API_BASE_URL}/api/agents/audit-logs?page_size=10`, { headers }),
+        ]);
+
+        if (overviewRes.ok) {
+          const ov = await overviewRes.json();
+          if (ov.data) {
+            setLiveOverview(ov.data);
+            setIsLive(true);
+          }
+        }
+        if (requestsRes.ok) {
+          const reqData = await requestsRes.json();
+          const items = Array.isArray(reqData.data) ? reqData.data : (reqData.data?.items || []);
+          if (items.length > 0) {
+            setLiveRequests(items.map((r: any) => [
+              `REQ-${(r.id || "").substring(0, 6).toUpperCase()}`,
+              r.patient_name || r.notes || "Urgent Patient",
+              r.blood_group,
+              r.location || "Central Hospital",
+              r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1).replace("_", " ")) : "Pending"
+            ]));
+          }
+        }
+        if (runsRes.ok) {
+          const runData = await runsRes.json();
+          const items = Array.isArray(runData.data) ? runData.data : (runData.data?.items || []);
+          if (items.length > 0) {
+            setLiveActivities(items.map((run: any) => [
+              run.agent_display_name || run.agent_name,
+              run.output_summary || run.error_message || "Agent execution finished",
+              run.started_at ? new Date(run.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"
+            ]));
+          }
+        }
+        if (auditRes.ok) {
+          const auditData = await auditRes.json();
+          const items = Array.isArray(auditData.data) ? auditData.data : (auditData.data?.items || []);
+          if (items.length > 0) {
+            setLiveAuditLogs(items.map((log: any) => [
+              log.action,
+              `${log.actor_type}: ${log.actor_id || "system"}`,
+              log.created_at ? new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"
+            ]));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch live admin data, running in demo mode:", err);
+      }
+    }
+    loadAdminData();
+  }, []);
+
+  const displayRequests = liveRequests.length > 0 ? liveRequests : requests;
+  const displayActivities = liveActivities.length > 0 ? liveActivities : activities;
+  const displayAuditLogs = liveAuditLogs.length > 0 ? liveAuditLogs : auditLogs;
+
+  const dynamicStats = [
+    {
+      title: "Total requests",
+      value: liveOverview ? String(liveOverview.total_requests) : "120",
+      change: "+12.5%",
+      icon: HeartPulse,
+      color: "#fb7185",
+      points: "0,40 15,35 30,38 45,25 60,30 75,15 100,5",
+    },
+    {
+      title: "Available donors",
+      value: liveOverview ? String(liveOverview.available_donors) : "348",
+      change: "+8.2%",
+      icon: Users,
+      color: "#2dd4bf",
+      points: "0,42 15,32 30,37 45,22 60,27 75,13 100,4",
+    },
+    {
+      title: "Invitations sent",
+      value: liveOverview ? String(liveOverview.invitations_total) : "86",
+      change: "+15.3%",
+      icon: Send,
+      color: "#a78bfa",
+      points: "0,40 15,34 30,38 45,20 60,28 75,12 100,5",
+    },
+    {
+      title: "Successful matches",
+      value: liveOverview ? String(liveOverview.invitations_accepted) : "64",
+      change: "+10.1%",
+      icon: CheckCircle2,
+      color: "#fbbf24",
+      points: "0,42 15,35 30,30 45,33 60,20 75,14 100,4",
+    },
+  ];
 
   const bg = dark ? "#020617" : "#f1f5f9";
   const card = dark ? "#0f172a" : "#ffffff";
@@ -259,27 +365,39 @@ export default function Home() {
           </div>
         </div>
 
-        {/* DEMO MODE */}
+        {/* CONNECTION / DEMO STATUS */}
         <div
           className="mb-9 flex items-start gap-5 rounded-2xl border p-6"
           style={{
-            background: dark ? "#03182e" : "#eff6ff",
-            borderColor: dark ? "#075985" : "#bfdbfe",
+            background: isLive ? (dark ? "#022c22" : "#f0fdf4") : (dark ? "#03182e" : "#eff6ff"),
+            borderColor: isLive ? (dark ? "#059669" : "#86efac") : (dark ? "#075985" : "#bfdbfe"),
           }}
         >
-          <Activity size={25} style={{ color: "#7dd3fc" }} />
+          {isLive ? (
+            <CheckCircle2 size={25} style={{ color: "#34d399" }} />
+          ) : (
+            <Activity size={25} style={{ color: "#7dd3fc" }} />
+          )}
           <p
             className="text-lg font-medium leading-7"
-            style={{ color: dark ? "#bae6fd" : "#1e40af" }}
+            style={{ color: isLive ? (dark ? "#a7f3d0" : "#166534") : (dark ? "#bae6fd" : "#1e40af") }}
           >
-            <strong>Demo mode.</strong> You’re looking at sample data.
-            Connect the backend API to show live platform information.
+            {isLive ? (
+              <>
+                <strong>Live Backend Connected.</strong> Displaying real-time operational analytics, AI agent executions, and database records.
+              </>
+            ) : (
+              <>
+                <strong>Demo mode.</strong> You’re looking at sample data.
+                Connect the backend API to show live platform information.
+              </>
+            )}
           </p>
         </div>
 
         {/* STATISTICS CARDS */}
         <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((item) => {
+          {dynamicStats.map((item) => {
             const Icon = item.icon;
 
             return (
@@ -502,7 +620,7 @@ export default function Home() {
               </thead>
 
               <tbody>
-                {requests
+                {displayRequests
                   .filter((request) => filter === "All" || request[4] === filter)
                   .map((request) => (
                     <tr key={request[0]} className="border-t" style={{ borderColor: border }}>
@@ -537,7 +655,7 @@ export default function Home() {
             </div>
 
             <div className="space-y-6">
-              {activities.map(([title, detail, time]) => (
+              {displayActivities.map(([title, detail, time]) => (
                 <div key={title} className="flex gap-4">
                   <CheckCircle2 size={23} className="shrink-0 text-emerald-400" />
                   <div>
@@ -563,7 +681,7 @@ export default function Home() {
             </div>
 
             <div className="space-y-5">
-              {auditLogs.map(([action, user, time]) => (
+              {displayAuditLogs.map(([action, user, time]) => (
                 <div
                   key={action}
                   className="flex justify-between gap-3 border-b pb-4"
