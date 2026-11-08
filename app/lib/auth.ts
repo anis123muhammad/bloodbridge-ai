@@ -25,6 +25,16 @@ export function saveUser(user: AuthUser) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
 }
 
+export function getToken(): string | null {
+    const user = getUser();
+    return user?.token || null;
+}
+
+export function getAuthHeaders(): Record<string, string> {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export function logout() {
     localStorage.removeItem(STORAGE_KEY);
 }

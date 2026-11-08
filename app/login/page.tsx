@@ -59,27 +59,30 @@ export default function LoginPage() {
                 body: JSON.stringify({ email, password, role }),
             });
 
-            const data = await response.json();
+            const resData = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || data.detail || "Login failed.");
+                throw new Error(resData.message || resData.detail || "Login failed.");
             }
 
-            const user = data.user || data;
+            // Support both wrapped { success, data: { access_token, me: { user } } } and raw payload
+            const inner = resData.data || resData;
+            const token = inner.access_token || inner.token || resData.token;
+            const user = inner.me?.user || inner.user || inner;
 
-            if (!["admin", "donor", "hospital"].includes(user.role)) {
+            if (!user?.role || !["admin", "donor", "hospital"].includes(user.role)) {
                 throw new Error("The server returned an invalid user role.");
             }
 
             if (user.role !== role) {
-                throw new Error("This account does not belong to the selected role.");
+                throw new Error(`This account is registered as a ${user.role}, not ${role}.`);
             }
 
             saveUser({
                 name: user.name || user.full_name || email,
                 email: user.email || email,
                 role: user.role,
-                token: data.token || data.access_token,
+                token: token,
             });
 
             router.push(getDashboardPath(user.role));

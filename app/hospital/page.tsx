@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getAuthHeaders } from "../lib/auth";
 import {
     Droplets, LayoutDashboard, FilePlus2, ClipboardList,
     Users, Bell, Moon, Sun, RefreshCw, MapPin,
@@ -139,20 +140,51 @@ export default function HospitalDashboard() {
     const red = "#f43f5e";
 
     const apiFetch = useCallback(async (path: string, options?: RequestInit) => {
+        const authHeaders = getAuthHeaders();
         const response = await fetch(`${API_URL}${path}`, {
             ...options,
             headers: {
                 "Content-Type": "application/json",
+                ...authHeaders,
                 ...options?.headers
             }
         });
 
         if (!response.ok) {
-            throw new Error(`Request failed (${response.status})`);
+            const errBody = await response.json().catch(() => ({}));
+            const msg = errBody.message || (errBody.errors && errBody.errors[0]?.message) || `Request failed (${response.status})`;
+            throw new Error(msg);
         }
 
-        return response.json();
+        const json = await response.json();
+        return json.data !== undefined ? json.data : json;
     }, []);
+
+    const mapBackendRequest = (r: any): BloodRequest => ({
+        id: r.id,
+        bloodGroup: r.blood_group || r.bloodGroup || "O+",
+        units: r.units_requested || r.units || 1,
+        location: r.location || "City",
+        urgency: r.urgency ? r.urgency.charAt(0).toUpperCase() + r.urgency.slice(1) : "Normal",
+        deadline: r.deadline || "",
+        status: r.status === "awaiting_approval" ? "Matching" : (r.status === "inviting_donors" ? "Matched" : (r.status === "fulfilled" ? "Completed" : "Pending")),
+        createdAt: r.created_at ? new Date(r.created_at).toLocaleDateString() : (r.createdAt || ""),
+        matches: (r.matches || []).map((m: any) => ({
+            id: m.id || m.donor_id,
+            name: m.donor_name || m.name || "Donor",
+            bloodGroup: m.blood_group || m.bloodGroup || r.blood_group,
+            location: m.city || m.location || "Nearby",
+            distance: m.distance_km != null ? `${m.distance_km} km` : (m.distance || "2.5 km"),
+            explanation: Array.isArray(m.match_reasons) ? m.match_reasons.join(". ") : (m.explanation || "Eligible donor match"),
+            score: m.match_score || m.score || 85,
+            status: m.status === "approved" ? "Approved" : (m.status === "rejected" ? "Rejected" : "Proposed")
+        })),
+        timeline: (r.timeline || []).map((t: any) => ({
+            label: t.title || t.label || "Action",
+            time: t.at ? new Date(t.at).toLocaleTimeString() : (t.time || ""),
+            done: t.status === "completed" || t.done === true
+        }))
+    });
 
     const loadRequests = useCallback(async () => {
         if (!API_URL) return;
@@ -161,14 +193,19 @@ export default function HospitalDashboard() {
         setError("");
 
         try {
-            const data = await apiFetch("/api/hospital/requests");
-            setRequests(Array.isArray(data) ? data : data.requests || []);
+            const data = await apiFetch("/api/requests");
+            const rawList = Array.isArray(data) ? data : (data.items || data.requests || []);
+            const mapped = rawList.map(mapBackendRequest);
+            setRequests(mapped);
+            if (mapped.length > 0 && (!selected || !mapped.find((m: BloodRequest) => m.id === selected))) {
+                setSelected(mapped[0].id);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Could not load requests.");
         } finally {
             setLoading(false);
         }
-    }, [apiFetch]);
+    }, [apiFetch, selected]);
 
     useEffect(() => {
         loadRequests();
@@ -180,22 +217,28 @@ export default function HospitalDashboard() {
         setSuccess("");
         setSubmitting(true);
 
+        const deadlineIso = form.deadline 
+            ? new Date(form.deadline).toISOString() 
+            : new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+
         const payload = {
+            title: `Blood Request for ${form.bloodGroup}`,
             blood_group: form.bloodGroup,
-            units: Number(form.units),
-            hospital_location: form.location,
-            urgency: form.urgency,
-            required_deadline: form.deadline
+            units_requested: Number(form.units),
+            location: form.location,
+            urgency: form.urgency.toLowerCase(),
+            deadline: deadlineIso,
+            auto_run_workflow: true
         };
 
         try {
             if (API_URL) {
-                await apiFetch("/api/hospital/requests", {
+                await apiFetch("/api/requests", {
                     method: "POST",
                     body: JSON.stringify(payload)
                 });
                 await loadRequests();
-                setSuccess("Blood request submitted successfully.");
+                setSuccess("Blood request submitted and AI matching workflow initiated.");
             } else {
                 const newRequest: BloodRequest = {
                     id: `REQ-${Date.now()}`,
@@ -236,7 +279,7 @@ export default function HospitalDashboard() {
 
     const approveMatch = async (
         requestId: string,
-        donorId: string,
+        matchId: string,
         approved: boolean
     ) => {
         setError("");
@@ -244,13 +287,13 @@ export default function HospitalDashboard() {
 
         try {
             if (API_URL) {
-                await apiFetch(
-                    `/api/hospital/requests/${requestId}/matches/${donorId}/approval`,
-                    {
-                        method: "POST",
-                        body: JSON.stringify({ approved })
-                    }
-                );
+                await apiFetch(`/api/requests/${requestId}/approve-matches`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        approve_ids: approved ? [matchId] : [],
+                        reject_ids: approved ? [] : [matchId]
+                    })
+                });
                 await loadRequests();
             } else {
                 setRequests(previous =>
@@ -259,7 +302,7 @@ export default function HospitalDashboard() {
                             ? {
                                 ...request,
                                 matches: request.matches.map(match =>
-                                    match.id === donorId
+                                    match.id === matchId
                                         ? { ...match, status: approved ? "Approved" : "Rejected" }
                                         : match
                                 )
@@ -271,7 +314,7 @@ export default function HospitalDashboard() {
 
             setSuccess(
                 approved
-                    ? "Donor match approved. Invitation can now be simulated."
+                    ? "Donor match approved. Coordination Agent created simulated invitation."
                     : "Donor match rejected."
             );
         } catch (err) {

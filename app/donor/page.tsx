@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getAuthHeaders } from "../lib/auth";
 import {
     Droplets,
     LayoutDashboard,
@@ -163,21 +164,47 @@ export default function DonorDashboard() {
         }
 
         try {
+            const authHeaders = getAuthHeaders();
             const [profileResponse, invitationsResponse] = await Promise.all([
-                fetch(`${API_URL}/api/donor/me`),
-                fetch(`${API_URL}/api/donor/invitations`),
+                fetch(`${API_URL}/api/donors/me`, { headers: { ...authHeaders } }),
+                fetch(`${API_URL}/api/invitations`, { headers: { ...authHeaders } }),
             ]);
 
             if (!profileResponse.ok || !invitationsResponse.ok) {
-                throw new Error("Unable to load donor dashboard data.");
+                throw new Error("Unable to load donor dashboard data. Please verify your login session.");
             }
 
             const profileData = await profileResponse.json();
             const invitationData = await invitationsResponse.json();
 
-            setDonor(profileData.donor ?? profileData);
+            const p = profileData.data || profileData.donor || profileData;
+            const invList = invitationData.data?.items || invitationData.data || invitationData.invitations || (Array.isArray(invitationData) ? invitationData : []);
+
+            setDonor({
+                id: p.id || demoDonor.id,
+                name: p.name || demoDonor.name,
+                bloodGroup: p.blood_group || p.bloodGroup || demoDonor.bloodGroup,
+                age: p.age || demoDonor.age,
+                city: p.city || demoDonor.city,
+                phone: p.phone || demoDonor.phone,
+                email: p.email || demoDonor.email,
+                lastDonation: p.last_donation_date || p.lastDonation || demoDonor.lastDonation,
+                availability: p.availability === "available" || p.availability === true,
+                totalDonations: (p.demo_eligibility?.donation_history?.length) || p.totalDonations || 0,
+            });
+
             setInvitations(
-                invitationData.invitations ?? invitationData
+                invList.map((inv: any) => ({
+                    id: inv.id,
+                    patient: inv.request_title || (inv.blood_group ? `${inv.blood_group} Patient` : "Blood Request"),
+                    bloodGroup: inv.blood_group || p.blood_group || "O+",
+                    hospital: inv.hospital_name || "Regional Hospital",
+                    location: inv.location || p.city || "Nearby",
+                    urgency: inv.urgency ? inv.urgency.charAt(0).toUpperCase() + inv.urgency.slice(1) : "Normal",
+                    date: inv.deadline ? new Date(inv.deadline).toLocaleDateString() : (inv.sent_at ? new Date(inv.sent_at).toLocaleDateString() : "Active"),
+                    units: inv.units_requested || 1,
+                    status: inv.status ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1) : "Pending",
+                }))
             );
         } catch (err) {
             setError(
@@ -204,12 +231,13 @@ export default function DonorDashboard() {
 
         try {
             if (!demoMode) {
+                const authHeaders = getAuthHeaders();
                 const response = await fetch(
-                    `${API_URL}/api/donor/availability`,
+                    `${API_URL}/api/donors/${donor.id}/availability`,
                     {
                         method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ availability: newAvailability }),
+                        headers: { "Content-Type": "application/json", ...authHeaders },
+                        body: JSON.stringify({ availability: newAvailability ? "available" : "unavailable" }),
                     }
                 );
 
@@ -243,12 +271,16 @@ export default function DonorDashboard() {
 
         try {
             if (!demoMode) {
+                const authHeaders = getAuthHeaders();
                 const response = await fetch(
-                    `${API_URL}/api/donor/invitations/${invitationId}/respond`,
+                    `${API_URL}/api/invitations/${invitationId}/respond`,
                     {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: responseStatus }),
+                        headers: { "Content-Type": "application/json", ...authHeaders },
+                        body: JSON.stringify({ 
+                            response: responseStatus.toLowerCase(),
+                            message: `I have ${responseStatus.toLowerCase()} the invitation.`
+                        }),
                     }
                 );
 
@@ -266,7 +298,8 @@ export default function DonorDashboard() {
             );
 
             setSuccess(
-                `Invitation ${invitationId} ${responseStatus.toLowerCase()} successfully.`
+                `Invitation ${responseStatus.toLowerCase()} successfully. The Follow-up Agent has recorded your response.`
+            );
             );
         } catch (err) {
             setError(

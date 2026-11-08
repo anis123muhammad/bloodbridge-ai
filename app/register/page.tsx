@@ -15,6 +15,9 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<UserRole>("donor");
+    const [city, setCity] = useState("Faisalabad");
+    const [hospitalName, setHospitalName] = useState("");
+    const [bloodGroup, setBloodGroup] = useState("O+");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -22,8 +25,18 @@ export default function RegisterPage() {
         e.preventDefault();
         setError("");
 
-        if (!name.trim() || !email.trim() || !password) {
-            setError("Please complete all fields.");
+        if (!name.trim() || !email.trim() || !password || !city.trim()) {
+            setError("Please complete all required fields including city.");
+            return;
+        }
+
+        if (role === "hospital" && !hospitalName.trim()) {
+            setError("Hospital Name is required for hospital accounts.");
+            return;
+        }
+
+        if (role === "donor" && !bloodGroup) {
+            setError("Blood Group is required for donor accounts.");
             return;
         }
 
@@ -32,8 +45,8 @@ export default function RegisterPage() {
             return;
         }
 
-        if (password.length < 8) {
-            setError("Password must contain at least 8 characters.");
+        if (password.length < 6) {
+            setError("Password must contain at least 6 characters.");
             return;
         }
 
@@ -45,32 +58,45 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
+            const payload: Record<string, any> = {
+                name,
+                email,
+                password,
+                role: role === "admin" ? "hospital" : role, // admins created via seed
+                city: city.trim(),
+            };
+
+            if (role === "hospital") {
+                payload.hospital_name = hospitalName.trim();
+            } else {
+                payload.blood_group = bloodGroup;
+            }
+
             const response = await fetch(`${API_URL}/api/auth/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, password, role }),
+                body: JSON.stringify(payload),
             });
 
-            const data = await response.json();
+            const resData = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || data.detail || "Registration failed.");
+                const errMsg = resData.message || (resData.errors && resData.errors[0]?.message) || resData.detail || "Registration failed.";
+                throw new Error(errMsg);
             }
 
-            const user = data.user || data;
-
-            if (!["admin", "donor", "hospital"].includes(user.role)) {
-                throw new Error("Registration returned an invalid role.");
-            }
+            const inner = resData.data || resData;
+            const token = inner.access_token || inner.token || resData.token;
+            const user = inner.me?.user || inner.user || inner;
 
             saveUser({
-                name: user.name || user.full_name || name,
-                email: user.email || email,
-                role: user.role,
-                token: data.token || data.access_token,
+                name: user?.name || name,
+                email: user?.email || email,
+                role: user?.role || role,
+                token: token,
             });
 
-            router.push(getDashboardPath(user.role));
+            router.push(getDashboardPath(user?.role || role));
         } catch (err) {
             setError(err instanceof Error ? err.message : "Unable to register.");
         } finally {
@@ -131,8 +157,51 @@ export default function RegisterPage() {
                         >
                             <option value="donor">Donor</option>
                             <option value="hospital">Hospital</option>
-                            <option value="admin">Admin</option>
                         </select>
+                    </label>
+
+                    {role === "hospital" && (
+                        <label className="block text-sm">
+                            Hospital Name
+                            <input
+                                value={hospitalName}
+                                onChange={e => setHospitalName(e.target.value)}
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-[#020617] p-3 outline-none focus:border-rose-500"
+                                placeholder="e.g. City General Hospital"
+                                required
+                            />
+                        </label>
+                    )}
+
+                    {role === "donor" && (
+                        <label className="block text-sm">
+                            Blood Group
+                            <select
+                                value={bloodGroup}
+                                onChange={e => setBloodGroup(e.target.value)}
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-[#020617] p-3 outline-none"
+                            >
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                            </select>
+                        </label>
+                    )}
+
+                    <label className="block text-sm">
+                        City
+                        <input
+                            value={city}
+                            onChange={e => setCity(e.target.value)}
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-[#020617] p-3 outline-none focus:border-rose-500"
+                            placeholder="e.g. Faisalabad, Lahore, Karachi"
+                            required
+                        />
                     </label>
 
                     {error && (
