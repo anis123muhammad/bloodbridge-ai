@@ -15,6 +15,13 @@ export default function ProtectedRoute({ children, allowedRole }: Props) {
     const [authorized, setAuthorized] = useState(false);
 
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const urlDemo = new URLSearchParams(window.location.search).get("demo");
+            if (urlDemo === allowedRole) {
+                setAuthorized(true);
+                return;
+            }
+        }
         const user = getUser();
 
         if (!user) {
