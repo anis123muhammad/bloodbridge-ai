@@ -300,7 +300,6 @@ export default function DonorDashboard() {
             setSuccess(
                 `Invitation ${responseStatus.toLowerCase()} successfully. The Follow-up Agent has recorded your response.`
             );
-            );
         } catch (err) {
             setError(
                 err instanceof Error ? err.message : "Could not update invitation."
