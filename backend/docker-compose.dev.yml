@@ -1,0 +1,17 @@
+# Local development database only. Production compose (frontend + backend + db + nginx)
+# lives at the repo root and is owned by deployment.
+#   docker compose -f docker-compose.dev.yml up -d
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: bloodbridge
+      POSTGRES_PASSWORD: bloodbridge
+      POSTGRES_DB: bloodbridge
+    ports:
+      - "5432:5432"
+    volumes:
+      - bloodbridge_pgdata:/var/lib/postgresql/data
+
+volumes:
+  bloodbridge_pgdata:
